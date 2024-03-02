@@ -1,0 +1,7 @@
+name: pulumi-aws-fastapi-infra
+runtime: java
+description: IAC for fast api using aws
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-java
