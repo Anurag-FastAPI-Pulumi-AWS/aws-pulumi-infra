@@ -1,0 +1,21 @@
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# IntelliJ IDEA files
+.idea/
+
+# Eclipse files
+.classpath
+.project
+.settings/
+
+# Maven-specific files and directories
+target/
+pulumi/
+
+# Gradle-specific files and directories
+build/
+.gradle/
