@@ -5,3 +5,6 @@ config:
 
   pulumi-aws-fastapi-infra:data:
     vpcCidr: 10.0.0.0/16
+    volume: 20
+    AmiId : "ami-00fab973116326ef8"
+    Keyname : "ec2"
