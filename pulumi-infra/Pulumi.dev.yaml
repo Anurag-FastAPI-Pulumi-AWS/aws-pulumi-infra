@@ -8,3 +8,10 @@ config:
     volume: 20
     AmiId : "ami-00fab973116326ef8"
     Keyname : "ec2"
+    db_engine: "postgres"
+    db_volume: 20
+    db_name: "fastapi"
+    db_username: "postgres"
+    db_password: "Anurag*98"
+    port: 5432
+    portsforrds: [5432]

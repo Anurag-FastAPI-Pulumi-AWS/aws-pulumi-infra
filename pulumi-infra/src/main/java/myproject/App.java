@@ -8,8 +8,15 @@ import com.pulumi.aws.ec2.inputs.RouteTableRouteArgs;
 import com.pulumi.aws.ec2.inputs.SecurityGroupEgressArgs;
 import com.pulumi.aws.ec2.inputs.SecurityGroupIngressArgs;
 import com.pulumi.aws.inputs.GetAvailabilityZonesArgs;
+import com.pulumi.aws.rds.ParameterGroup;
+import com.pulumi.aws.rds.ParameterGroupArgs;
+import com.pulumi.aws.rds.SubnetGroup;
+import com.pulumi.aws.rds.SubnetGroupArgs;
+import com.pulumi.core.Output;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 
@@ -51,11 +58,23 @@ public class App {
                     .routeTableId(publicroutetable.id())
                     .build()
             );
-            Subnet db_private_subnet = new Subnet("db", new SubnetArgs.Builder()
+            Subnet db_private_subnet_1 = new Subnet("db_private_subnet_1", new SubnetArgs.Builder()
                     .vpcId(vpc.id())
                     .availabilityZone("us-east-1a") // Should remove hard coding
                     .cidrBlock("10.0.1.0/24")
-                    .tags(Map.of("Name", vpcname + "db"))
+                    .tags(Map.of("db_private_subnet_1", vpcname + "db"))
+                    .build());
+            Subnet db_private_subnet_2 = new Subnet("db_private_subnet_2", new SubnetArgs.Builder()
+                    .vpcId(vpc.id())
+                    .availabilityZone("us-east-1b") // Should remove hard coding
+                    .cidrBlock("10.0.2.0/24")
+                    .tags(Map.of("db_private_subnet_2", vpcname + "db"))
+                    .build());
+            Subnet db_private_subnet_3 = new Subnet("db_private_subnet_3", new SubnetArgs.Builder()
+                    .vpcId(vpc.id())
+                    .availabilityZone("us-east-1c") // Should remove hard coding
+                    .cidrBlock("10.0.3.0/24")
+                    .tags(Map.of("db_private_subnet_3", vpcname + "db"))
                     .build());
 
 //
@@ -73,7 +92,6 @@ public class App {
                             .cidrBlocks(Collections.singletonList("0.0.0.0/0"))
                             .build())
                     .ingress(SecurityGroupIngressArgs.builder()
-
                             .protocol("tcp")
                             .fromPort(8000)
                             .toPort(8000)
@@ -124,6 +142,61 @@ public class App {
                     .tags(Map.of("Name", "ec2dev"))
                     .userData(userData)
                     .build());
+
+            ParameterGroup parameterGroup = new ParameterGroup("postgrespg", new ParameterGroupArgs.Builder()
+                    .family("postgres16")
+                    .tags(Map.of("Name", "postgrespg"))
+                    .build());
+
+            List<Output<String>> subnetIds = new ArrayList<>();
+            subnetIds.add(db_private_subnet_1.id());
+            subnetIds.add(db_private_subnet_2.id());
+            subnetIds.add(db_private_subnet_3.id());
+            Output<List<String>> subnetIdsOutput = Output.all(subnetIds).applyValue(ids -> ids);
+            SubnetGroup privatesubnetGroup = new SubnetGroup("privatesubnetgroup", SubnetGroupArgs.builder()
+                    .subnetIds(subnetIdsOutput)
+                    .build());
+            List<Double> allowedPortsforrds = (List<Double>) data.get("portsforrds");
+            SecurityGroup rds_security_group = new SecurityGroup("rds_security_group", new SecurityGroupArgs.Builder()
+                    .vpcId(vpc.id())
+                    .tags(Map.of("Name", "databasesecuritygroup"))
+                    .build());
+            for (Double ports : allowedPortsforrds) {
+                SecurityGroupRule rules = new SecurityGroupRule("ingressRule-" + ports, new SecurityGroupRuleArgs.Builder()
+                        .type("ingress")
+                        .fromPort(ports.intValue())
+                        .toPort(ports.intValue())
+                        .protocol("tcp")
+                        .sourceSecurityGroupId(appSecurityGroup.id())
+                        .securityGroupId(rds_security_group.id())
+                        .build());
+//                SecurityGroupRule egressRulepostgres = new SecurityGroupRule("egressRulepostgres"+ports, new SecurityGroupRuleArgs.Builder()
+//                        .type("egress")
+//                        .fromPort(ports.intValue())
+//                        .toPort(ports.intValue())
+//                        .protocol("tcp")
+//                        .sourceSecurityGroupId(rds_security_group.id())
+//                        .securityGroupId(appSecurityGroup.id())
+//                        .build());
+            }
+            Double dbvolume = (Double) data.get("db_volume");
+            Double portnum = (Double) data.get("port");
+            com.pulumi.aws.rds.Instance rdsDbInstance = new com.pulumi.aws.rds.Instance("csye6225", new com.pulumi.aws.rds.InstanceArgs.Builder()
+                    .engine(data.get("db_engine").toString())
+                    .instanceClass("db.t3.micro")
+                    .multiAz(false)
+                    .allocatedStorage(dbvolume.intValue())
+                    .parameterGroupName(parameterGroup.name())
+                    .dbName(data.get("db_name").toString())
+                    .username(data.get("db_username").toString())
+                    .password(data.get("db_password").toString())
+                    .vpcSecurityGroupIds(rds_security_group.id().applyValue(Collections::singletonList))
+                    .dbSubnetGroupName(privatesubnetGroup.name())
+                    .port(portnum.intValue())
+                    .publiclyAccessible(false)
+                    .skipFinalSnapshot(true)
+                    .build());
         });
+
     }
 }
